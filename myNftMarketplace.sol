@@ -15,9 +15,6 @@ contract Marketplace is ReentrancyGuard {
 
     address payable private owner;
 
-    
-    uint256 private listingFee = 0.056 ether;
-
     mapping(uint256 => MarketItem) private marketItemIdToMarketItem;
 
     struct MarketItem {
@@ -48,10 +45,10 @@ contract Marketplace is ReentrancyGuard {
         owner = payable(msg.sender);
     }
 
-    function getListingFee() public view returns (uint256) {
-        return listingFee;
+ //pure function that returns the constant listing fee of 0.056ether
+   function getListingFee() public pure returns (uint) {
+        return 0.056 ether;
     }
-
     
     function createMarketItem(
         address nftContractAddress,
@@ -59,7 +56,7 @@ contract Marketplace is ReentrancyGuard {
         uint256 price
     ) public payable nonReentrant returns (uint256) {
         require(price > 0, "Price must be at least 1 wei");
-        require(msg.value == listingFee, "Price must be equal to listing price");
+        require(msg.value == getListingFee(), "Price must be equal to listing price");
         _marketItemIds.increment();
         uint256 marketItemId = _marketItemIds.current();
 
@@ -136,12 +133,12 @@ contract Marketplace is ReentrancyGuard {
         marketItemIdToMarketItem[marketItemId].owner = payable(msg.sender);
         marketItemIdToMarketItem[marketItemId].sold = true;
 
-        marketItemIdToMarketItem[marketItemId].seller.transfer(msg.value);
+        address sellerAddress = marketItemIdToMarketItem[marketItemId].seller;
+        (bool paidSeller, ) = payable(sellerAddress).call{value: msg.value}(""); 
         IERC721(nftContractAddress).transferFrom(address(this), msg.sender, tokenId);
-
         _tokensSold.increment();
 
-        payable(owner).transfer(listingFee);
+        (bool sent, ) = payable(owner).call{value: getListingFee()}(""); 
     }
 
     
