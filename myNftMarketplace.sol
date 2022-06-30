@@ -58,11 +58,11 @@ contract Marketplace is ReentrancyGuard {
         uint256 tokenId,
         uint256 price
     ) public payable nonReentrant returns (uint256) {
+        require(nftContractAddress != address(0), "Enter a valid address");
         require(price > 0, "Price must be at least 1 wei");
         require(msg.value == listingFee, "Price must be equal to listing price");
-        _marketItemIds.increment();
         uint256 marketItemId = _marketItemIds.current();
-
+        _marketItemIds.increment();
         address creator = NFT(nftContractAddress).getTokenCreatorById(tokenId);
 
         marketItemIdToMarketItem[marketItemId] = MarketItem(
@@ -98,8 +98,9 @@ contract Marketplace is ReentrancyGuard {
       Cancel a market item
      */
     function cancelMarketItem(address nftContractAddress, uint256 marketItemId) public payable nonReentrant {
+        require(nftContractAddress != address(0), "Enter a valid address");
         uint256 tokenId = marketItemIdToMarketItem[marketItemId].tokenId;
-        require(tokenId > 0, "Market item has to exist");
+        require(tokenId >= 0, "Market item has to exist");
 
         require(marketItemIdToMarketItem[marketItemId].seller == msg.sender, "You are not the seller");
 
@@ -117,7 +118,7 @@ contract Marketplace is ReentrancyGuard {
     function getLatestMarketItemByTokenId(uint256 tokenId) public view returns (MarketItem memory, bool) {
         uint256 itemsCount = _marketItemIds.current();
 
-        for (uint256 i = itemsCount; i > 0; i--) {
+        for (uint256 i = itemsCount; i >= 0; i--) {
             MarketItem memory item = marketItemIdToMarketItem[i];
             if (item.tokenId != tokenId) continue;
             return (item, true);
@@ -129,6 +130,7 @@ contract Marketplace is ReentrancyGuard {
 
     
     function createMarketSale(address nftContractAddress, uint256 marketItemId) public payable nonReentrant {
+        require(nftContractAddress != address(0), "Enter a valid address");
         uint256 price = marketItemIdToMarketItem[marketItemId].price;
         uint256 tokenId = marketItemIdToMarketItem[marketItemId].tokenId;
         require(msg.value == price, "Please submit the asking price in order to continue");
@@ -140,8 +142,8 @@ contract Marketplace is ReentrancyGuard {
         IERC721(nftContractAddress).transferFrom(address(this), msg.sender, tokenId);
 
         _tokensSold.increment();
-
-        payable(owner).transfer(listingFee);
+        (bool success,) = owner.call{value: listingFee}("");
+        require(success, "Transfer failed");
     }
 
     
@@ -156,7 +158,7 @@ contract Marketplace is ReentrancyGuard {
         uint256 currentIndex = 0;
         for (uint256 i = 0; i < itemsCount; i++) {
             
-            MarketItem memory item = marketItemIdToMarketItem[i + 1];
+            MarketItem memory item = marketItemIdToMarketItem[i];
             if (item.owner != address(0)) continue;
             marketItems[currentIndex] = item;
             currentIndex += 1;
@@ -213,7 +215,7 @@ contract Marketplace is ReentrancyGuard {
 
         for (uint256 i = 0; i < totalItemsCount; i++) {
             
-            MarketItem storage item = marketItemIdToMarketItem[i + 1];
+            MarketItem storage item = marketItemIdToMarketItem[i];
             address addressPropertyValue = getMarketItemAddressByProperty(item, _addressProperty);
             if (addressPropertyValue != msg.sender) continue;
             itemCount += 1;
@@ -223,7 +225,7 @@ contract Marketplace is ReentrancyGuard {
 
         for (uint256 i = 0; i < totalItemsCount; i++) {
              
-            MarketItem storage item = marketItemIdToMarketItem[i + 1];
+            MarketItem storage item = marketItemIdToMarketItem[i];
             address addressPropertyValue = getMarketItemAddressByProperty(item, _addressProperty);
             if (addressPropertyValue != msg.sender) continue;
             items[currentIndex] = item;
