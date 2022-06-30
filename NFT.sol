@@ -6,12 +6,15 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
  
-contract NFT is ERC721URIStorage {
+contract NFT is ERC721, ERC721URIStorage {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
     address private marketplaceAddress;
     mapping(uint256 => address) private _creators;
+
+    mapping(address => uint[]) createdPerWallet;
+    mapping(address => uint[]) ownedPerWallet;
 
     event TokenMinted(uint256 indexed tokenId, string tokenURI, address marketplaceAddress);
 
@@ -19,30 +22,30 @@ contract NFT is ERC721URIStorage {
         marketplaceAddress = _marketplaceAddress;
     }
 
-    function mintToken(string memory tokenURI) public returns (uint256) {
-        _tokenIds.increment();
+    function mintToken(string memory _tokenURI) public returns (uint256) {
         uint256 newItemId = _tokenIds.current();
+        _tokenIds.increment();
         _mint(msg.sender, newItemId);
         _creators[newItemId] = msg.sender;
-        _setTokenURI(newItemId, tokenURI);
+        createdPerWallet[msg.sender].push(newItemId);
+        ownedPerWallet[msg.sender].push(newItemId);
+        _setTokenURI(newItemId, _tokenURI);
 
         //  this is to Give the marketplace approval to transact NFTs between users
         setApprovalForAll(marketplaceAddress, true);
 
-        emit TokenMinted(newItemId, tokenURI, marketplaceAddress);
+        emit TokenMinted(newItemId, _tokenURI, marketplaceAddress);
         return newItemId;
     }
 
     function getTokensOwnedByMe() public view returns (uint256[] memory) {
-        uint256 numberOfExistingTokens = _tokenIds.current();
         uint256 numberOfTokensOwned = balanceOf(msg.sender);
         uint256[] memory ownedTokenIds = new uint256[](numberOfTokensOwned);
 
         uint256 currentIndex = 0;
-        for (uint256 i = 0; i < numberOfExistingTokens; i++) {
-            uint256 tokenId = i + 1;
-            if (ownerOf(tokenId) != msg.sender) continue;
-            ownedTokenIds[currentIndex] = tokenId;
+        for (uint256 i = 0; i < ownedPerWallet[msg.sender].length; i++) {
+            if (ownerOf(ownedPerWallet[msg.sender][i]) != msg.sender) continue;
+            ownedTokenIds[currentIndex] = ownedPerWallet[msg.sender][i];
             currentIndex += 1;
         }
 
@@ -54,24 +57,21 @@ contract NFT is ERC721URIStorage {
     }
 
     function getTokensCreatedByMe() public view returns (uint256[] memory) {
-        uint256 numberOfExistingTokens = _tokenIds.current();
-        uint256 numberOfTokensCreated = 0;
+        return createdPerWallet[msg.sender];
+    }
 
-        for (uint256 i = 0; i < numberOfExistingTokens; i++) {
-            uint256 tokenId = i + 1;
-            if (_creators[tokenId] != msg.sender) continue;
-            numberOfTokensCreated += 1;
-        }
+        // The following functions are overrides required by Solidity.
 
-        uint256[] memory createdTokenIds = new uint256[](numberOfTokensCreated);
-        uint256 currentIndex = 0;
-        for (uint256 i = 0; i < numberOfExistingTokens; i++) {
-            uint256 tokenId = i + 1;
-            if (_creators[tokenId] != msg.sender) continue;
-            createdTokenIds[currentIndex] = tokenId;
-            currentIndex += 1;
-        }
+    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
+        super._burn(tokenId);
+    }
 
-        return createdTokenIds;
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        override(ERC721, ERC721URIStorage)
+        returns (string memory)
+    {
+        return super.tokenURI(tokenId);
     }
 }
